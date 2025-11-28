@@ -10,12 +10,21 @@ dotenv.config();
 
 const app = express();
 app.use(cors({
-  origin: "http://localhost:3000", // frontend origin
+  origin: ["http://localhost:3000", "http://localhost:5173"],
   methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true
 }));
+
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: "*" } });
+
+const io = new Server(server, { 
+  cors: { 
+    origin: ["http://localhost:3000", "http://localhost:5173"],
+    methods: ["GET", "POST"],
+    credentials: true
+  },
+  transports: ['websocket', 'polling']
+});
 
 const MQTT_BROKER = process.env.MQTT_BROKER || "mqtt://127.0.0.1:1883";
 const MONGO_URL = process.env.MONGO_URL || "mongodb://127.0.0.1:27017";
@@ -29,47 +38,85 @@ const PORT = process.env.PORT || 3001;
   const db = mongo.db(DB_NAME);
   const slotsCol = db.collection("slots");
 
-  // MQTT
-  const client = mqtt.connect("mqtt://127.0.0.1:1883", { family: 4 });
+  // Socket.IO - Set this up BEFORE MQTT
+  io.on("connection", async (socket) => {
+    console.log("✅ Client connected:", socket.id);
+    
+    // Send initial data when client connects
+    try {
+      const slots = await slotsCol.find().sort({ slot_id: 1 }).toArray();
+      socket.emit("initialData", slots);
+      console.log("📤 Sent initial data to client:", socket.id);
+    } catch (err) {
+      console.error("❌ Error sending initial data:", err);
+    }
 
- client.on("connect", () => {
-  console.log("✅ MQTT connected to broker");
-  client.subscribe("parking/slot/+/telemetry", (err) => {
-    if (err) console.error("❌ MQTT subscribe error:", err);
-    else console.log("✅ Subscribed to parking/slot/+/telemetry");
+    socket.on("disconnect", () => {
+      console.log("❌ Client disconnected:", socket.id);
+    });
   });
-});
+
+  // MQTT
+  const client = mqtt.connect(MQTT_BROKER, { family: 4 });
+
+  client.on("connect", () => {
+    console.log("✅ MQTT connected to broker");
+    client.subscribe("parking/slot/+/telemetry", (err) => {
+      if (err) console.error("❌ MQTT subscribe error:", err);
+      else console.log("✅ Subscribed to parking/slot/+/telemetry");
+    });
+  });
 
   client.on("error", (err) => console.error("❌ MQTT connection error:", err.message));
   client.on("offline", () => console.log("⚠️ MQTT offline"));
   client.on("reconnect", () => console.log("🔄 MQTT trying to reconnect..."));
 
   client.on("message", async (topic, message) => {
-  console.log("📨 MQTT message received:", topic, message.toString()); // first see raw message
-  try {
-    const data = JSON.parse(message.toString());
-    console.log("✅ JSON parsed:", data);
-    await slotsCol.updateOne({ slot_id: data.slot_id }, { $set: data }, { upsert: true });
-    io.emit("slotUpdate", data);
-  } catch (err) {
-    console.error("❌ JSON parse error:", err);
-  }
-});
-
+    console.log("📨 MQTT message received:", topic, message.toString());
+    try {
+      const data = JSON.parse(message.toString());
+      console.log("✅ JSON parsed:", data);
+      
+      // Update MongoDB
+      await slotsCol.updateOne(
+        { slot_id: data.slot_id }, 
+        { $set: data }, 
+        { upsert: true }
+      );
+      
+      // Emit to ALL connected Socket.IO clients
+      const connectedClients = io.engine.clientsCount;
+      console.log(`📤 Emitting to ${connectedClients} connected clients`);
+      io.emit("slotUpdate", data);
+      console.log("✅ Emitted slotUpdate:", data);
+      
+    } catch (err) {
+      console.error("❌ Error processing MQTT message:", err);
+    }
+  });
 
   // REST API
   app.get("/api/slots", async (req, res) => {
-    const slots = await slotsCol.find().sort({ slot_id: 1 }).toArray();
-    res.json(slots);
+    try {
+      const slots = await slotsCol.find().sort({ slot_id: 1 }).toArray();
+      res.json(slots);
+    } catch (err) {
+      console.error("❌ Error fetching slots:", err);
+      res.status(500).json({ error: "Failed to fetch slots" });
+    }
   });
 
-  // Socket.IO
-  io.on("connection", (socket) => {
-    console.log("Client connected:", socket.id);
-    socket.on("disconnect", () => console.log("Client disconnected"));
+  // Health check endpoint
+  app.get("/api/health", (req, res) => {
+    res.json({ 
+      status: "ok", 
+      mqtt: client.connected,
+      socketClients: io.engine.clientsCount
+    });
   });
 
-  server.listen(PORT, () =>
-    console.log(`Backend → http://localhost:${PORT}`)
-  );
+  server.listen(PORT, () => {
+    console.log(`🚀 Backend running → http://localhost:${PORT}`);
+    console.log(`🔌 Socket.IO ready for connections`);
+  });
 })();
