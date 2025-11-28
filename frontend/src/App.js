@@ -2,8 +2,10 @@ import React, { useEffect, useState } from "react";
 import io from "socket.io-client";
 import SlotGrid from "./components/SlotGrid";
 
+const BACKEND_URL = "http://136.112.175.183:3001"; 
+
 // Create socket connection OUTSIDE component to prevent reconnections
-const socket = io("http://localhost:3001", {
+const socket = io(BACKEND_URL, {
   transports: ['websocket', 'polling'],
   reconnection: true,
   reconnectionDelay: 1000,
@@ -68,7 +70,8 @@ export default function App() {
     });
 
     // Fallback: Also fetch via REST API on mount
-    fetch("http://localhost:3001/api/slots")
+    // fetch("http://localhost:3001/api/slots")
+    fetch(`${BACKEND_URL}/api/slots`)
       .then(res => res.json())
       .then(data => {
         console.log("📥 Fallback: Initial slots from REST API:", data);
