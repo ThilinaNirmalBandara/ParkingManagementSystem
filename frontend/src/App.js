@@ -171,7 +171,11 @@ export default function App() {
         </div>
       )}
 
-      <SlotGrid slots={slots} />
+      <SlotGrid 
+        slots={slots} 
+        onChangeStatus={handleStatusChange}
+      />
+
 
       {/* Debug panel - remove in production */}
       {/*

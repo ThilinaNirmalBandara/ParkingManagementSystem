@@ -1,6 +1,6 @@
 import React from "react";
 
-export default function SlotGrid({ slots }) {
+export default function SlotGrid({ slots, onChangeStatus }) {
   // Create array of 21 slots, filling in with data or defaults
   const allSlots = Array.from({ length: 21 }, (_, i) => {
     const slotNumber = i + 1;
@@ -80,6 +80,12 @@ export default function SlotGrid({ slots }) {
               position: "relative",
               overflow: "hidden"
             }}
+            // ✅ handle click → compute nextStatus → notify parent
+            onClick={() => {
+              if (!onChangeStatus) return; // safety
+              const nextStatus = cycleStatus(slot.status);
+              onChangeStatus(slot.slot_id, nextStatus);
+            }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = "translateY(-5px)";
               e.currentTarget.style.boxShadow = "0 8px 12px rgba(0, 0, 0, 0.2)";
@@ -135,6 +141,7 @@ export default function SlotGrid({ slots }) {
                slot.status === "reserved" ? "🔒" : 
                "✓"}
             </div>
+
             {/* power / signal info */}
             <div style={{
               marginTop: "12px",
