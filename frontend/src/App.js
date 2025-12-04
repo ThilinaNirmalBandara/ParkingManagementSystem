@@ -110,7 +110,7 @@ export default function App() {
     setLoginError("");
 
     try {
-      const res = await fetch(`${BACKEND_URL}/api/login`, {
+      const res = await fetch(`${BACKEND_URL}/api/admin/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
