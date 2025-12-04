@@ -5,16 +5,20 @@ import mqtt from "mqtt";
 import { MongoClient } from "mongodb";
 import dotenv from "dotenv";
 import { Server } from "socket.io";
-import jwt from "jsonwebtoken"; 
+import jwt from "jsonwebtoken";
 
 dotenv.config();
 
 const app = express();
 app.use(cors({
-  origin: ["http://localhost:3000", "http://localhost:5173", "http://136.112.175.183:3000"],
+  origin: [
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://136.112.175.183:3000"   // frontend on VM
+  ],
   methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true,
-  allowedHeaders: ["Content-Type", "Authorization"] 
+  allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
 app.use(express.json());
@@ -23,20 +27,70 @@ const server = http.createServer(app);
 
 const io = new Server(server, { 
   cors: { 
-    origin: ["http://localhost:3000", "http://localhost:5173"],
+    origin: [
+      "http://localhost:3000",
+      "http://localhost:5173",
+      "http://136.112.175.183:3000"
+    ],
     methods: ["GET", "POST"],
     credentials: true
   },
-  transports: ['websocket', 'polling']
+  transports: ["websocket", "polling"]
 });
 
-const MQTT_BROKER = process.env.MQTT_BROKER || "mqtt://127.0.0.1:1883";
+// ---- Config ----
+const MQTT_BROKER   = process.env.MQTT_BROKER   || "mqtt://127.0.0.1:1883";
 const MQTT_USERNAME = process.env.MQTT_USERNAME || "parking_admin";
 const MQTT_PASSWORD = process.env.MQTT_PASSWORD || "Password123";
-const MONGO_URL = process.env.MONGO_URL || "mongodb://127.0.0.1:27017";
-const DB_NAME = "parkingdb";
-const PORT = process.env.PORT || 3001;
 
+const MONGO_URL = process.env.MONGO_URL || "mongodb://127.0.0.1:27017";
+const DB_NAME   = "parkingdb";
+const PORT      = process.env.PORT || 3001;
+
+const JWT_SECRET = process.env.JWT_SECRET || "super-secret-change-me";
+
+// Simple hard-coded admin user (for demo)
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "admin";
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "Admin@123";
+
+// ---- Middleware: requireAdmin ----
+function requireAdmin(req, res, next) {
+  try {
+    const auth = req.headers.authorization || "";
+    if (!auth.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Missing or invalid Authorization header" });
+    }
+
+    const token = auth.slice(7); // remove "Bearer "
+    const payload = jwt.verify(token, JWT_SECRET); // throws if invalid/expired
+
+    // Optionally check role here if you add it later
+    req.user = payload;
+    next();
+  } catch (err) {
+    console.error("❌ Auth error:", err.message);
+    return res.status(401).json({ error: "Invalid or expired token" });
+  }
+}
+
+// ---- Login Route (issues JWT) ----
+app.post("/api/admin/login", (req, res) => {
+  const { username, password } = req.body || {};
+
+  if (username !== ADMIN_USERNAME || password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: "Invalid credentials" });
+  }
+
+  const token = jwt.sign(
+    { username, role: "admin" },
+    JWT_SECRET,
+    { expiresIn: "8h" }
+  );
+
+  res.json({ token });
+});
+
+// ---- Main async bootstrap ----
 (async () => {
   // MongoDB
   const mongo = new MongoClient(MONGO_URL);
@@ -44,11 +98,10 @@ const PORT = process.env.PORT || 3001;
   const db = mongo.db(DB_NAME);
   const slotsCol = db.collection("slots");
 
-  // Socket.IO - Set this up BEFORE MQTT
+  // Socket.IO
   io.on("connection", async (socket) => {
     console.log("✅ Client connected:", socket.id);
     
-    // Send initial data when client connects
     try {
       const slots = await slotsCol.find().sort({ slot_id: 1 }).toArray();
       socket.emit("initialData", slots);
@@ -62,12 +115,12 @@ const PORT = process.env.PORT || 3001;
     });
   });
 
-  // MQTT
+  // MQTT (with username/password)
   const client = mqtt.connect(MQTT_BROKER, { 
     family: 4,
     username: MQTT_USERNAME,
     password: MQTT_PASSWORD
-   });
+  });
 
   client.on("connect", () => {
     console.log("✅ MQTT connected to broker");
@@ -87,14 +140,12 @@ const PORT = process.env.PORT || 3001;
       const data = JSON.parse(message.toString());
       console.log("✅ JSON parsed:", data);
       
-      // Update MongoDB
       await slotsCol.updateOne(
         { slot_id: data.slot_id }, 
         { $set: data }, 
         { upsert: true }
       );
       
-      // Emit to ALL connected Socket.IO clients
       const connectedClients = io.engine.clientsCount;
       console.log(`📤 Emitting to ${connectedClients} connected clients`);
       io.emit("slotUpdate", data);
@@ -105,7 +156,7 @@ const PORT = process.env.PORT || 3001;
     }
   });
 
-  // REST API
+  // ---- REST API ----
   app.get("/api/slots", async (req, res) => {
     try {
       const slots = await slotsCol.find().sort({ slot_id: 1 }).toArray();
@@ -116,8 +167,8 @@ const PORT = process.env.PORT || 3001;
     }
   });
   
-  // 🆕 Update slot status from frontend
-  app.put("/api/slots/:id/status",requireAdmin, async (req, res) => {
+  // 🔒 Update slot status – protected by requireAdmin
+  app.put("/api/slots/:id/status", requireAdmin, async (req, res) => {
     try {
       const slotId = parseInt(req.params.id, 10);
       const { status } = req.body;
@@ -130,21 +181,19 @@ const PORT = process.env.PORT || 3001;
         $set: {
           slot_id: slotId,
           status: status.toLowerCase(),
-          updated_by: req.user?.username ||"frontend",
+          updated_by: req.user?.username || "frontend",
           updated_at: new Date()
         }
       };
 
-      const result = await slotsCol.updateOne(
+      await slotsCol.updateOne(
         { slot_id: slotId },
         update,
         { upsert: true }
       );
 
-      // Read back the full document to emit
       const updatedDoc = await slotsCol.findOne({ slot_id: slotId });
 
-      // Emit to all Socket.IO clients so they update in real time
       io.emit("slotUpdate", updatedDoc);
 
       console.log(`✅ Slot ${slotId} status updated from frontend →`, updatedDoc);
@@ -156,7 +205,7 @@ const PORT = process.env.PORT || 3001;
     }
   });
 
-  // Health check endpoint
+  // Health check
   app.get("/api/health", (req, res) => {
     res.json({ 
       status: "ok", 
@@ -166,7 +215,7 @@ const PORT = process.env.PORT || 3001;
   });
 
   server.listen(PORT, () => {
-    console.log(`🚀 Backend running → http://localhost:${PORT}`);
+    console.log(`🚀 Backend running → http://0.0.0.0:${PORT}`);
     console.log(`🔌 Socket.IO ready for connections`);
   });
 })();
