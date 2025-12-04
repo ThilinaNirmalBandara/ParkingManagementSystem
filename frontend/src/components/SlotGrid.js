@@ -1,7 +1,7 @@
 import React from "react";
 
 export default function SlotGrid({ slots }) {
-  // Create array of 20 slots, filling in with data or defaults
+  // Create array of 21 slots, filling in with data or defaults
   const allSlots = Array.from({ length: 21 }, (_, i) => {
     const slotNumber = i + 1;
     const slotData = slots.find(s => s.slot_id === slotNumber);
@@ -9,7 +9,11 @@ export default function SlotGrid({ slots }) {
     return {
       slot_id: slotNumber,
       status: slotData?.status || "free",
-      _id: slotData?._id
+      _id: slotData?._id,
+      battery_percent: slotData?.battery_percent,
+      battery_mv: slotData?.battery_mv,
+      rssi_dbm: slotData?.rssi_dbm,
+      timestamp: slotData?.timestamp
     };
   });
 
@@ -122,6 +126,22 @@ export default function SlotGrid({ slots }) {
               {slot.status === "occupied" ? "🚗" : 
                slot.status === "reserved" ? "🔒" : 
                "✓"}
+            </div>
+            {/* power / signal info */}
+            <div style={{
+              marginTop: "12px",
+              fontSize: "12px",
+              color: "#e5e7eb",
+              position: "relative",
+              zIndex: 1,
+              lineHeight: 1.4
+            }}>
+              <div>
+                🔋 Battery: {slot.battery_percent != null ? `${slot.battery_percent}%` : "N/A"}
+              </div>
+              <div>
+                📶 RSSI: {slot.rssi_dbm != null ? `${slot.rssi_dbm} dBm` : "N/A"}
+              </div>
             </div>
           </div>
         );

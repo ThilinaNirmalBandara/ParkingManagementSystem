@@ -144,6 +144,7 @@ export default function App() {
       <SlotGrid slots={slots} />
 
       {/* Debug panel - remove in production */}
+      {/*
       <div style={{
         marginTop: "20px",
         padding: "15px",
@@ -163,6 +164,7 @@ export default function App() {
           }, null, 2)}
         </pre>
       </div>
+      */}
     </div>
   );
 }
