@@ -46,6 +46,14 @@ export default function SlotGrid({ slots }) {
     }
   };
 
+  // Cycle statuses when clicking a slot
+  const cycleStatus = (status) => {
+    const s = status?.toLowerCase();
+    if (s === "free") return "reserved";
+    if (s === "reserved") return "occupied";
+    return "free"; // from occupied or unknown
+  };
+
   return (
     <div style={{
       display: "grid",

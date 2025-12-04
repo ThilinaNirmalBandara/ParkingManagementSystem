@@ -91,6 +91,36 @@ export default function App() {
       socket.off("slotUpdate");
     };
   }, []); // Empty dependency array - only run once
+  // 🔁 Handler: change slot status from frontend
+  const handleStatusChange = async (slotId, newStatus) => {
+    try {
+      console.log(`📝 Changing slot ${slotId} → ${newStatus}`);
+
+      const res = await fetch(`${BACKEND_URL}/api/slots/${slotId}/status`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        console.error("❌ Failed to update status:", err);
+        alert("Failed to update status");
+        return;
+      }
+
+      const updated = await res.json();
+      console.log("✅ Status update saved:", updated);
+
+      // No need to manually update state; backend will emit `slotUpdate`.
+    } catch (err) {
+      console.error("❌ Error calling status API:", err);
+      alert("Error updating status");
+    }
+  };
+  
 
   return (
     <div style={{

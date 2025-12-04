@@ -15,6 +15,8 @@ app.use(cors({
   credentials: true
 }));
 
+app.use(express.json());
+
 const server = http.createServer(app);
 
 const io = new Server(server, { 
@@ -103,6 +105,46 @@ const PORT = process.env.PORT || 3001;
     } catch (err) {
       console.error("❌ Error fetching slots:", err);
       res.status(500).json({ error: "Failed to fetch slots" });
+    }
+  });
+  
+  // 🆕 Update slot status from frontend
+  app.put("/api/slots/:id/status", async (req, res) => {
+    try {
+      const slotId = parseInt(req.params.id, 10);
+      const { status } = req.body;
+
+      if (!["free", "occupied", "reserved"].includes(status?.toLowerCase())) {
+        return res.status(400).json({ error: "Invalid status" });
+      }
+
+      const update = {
+        $set: {
+          slot_id: slotId,
+          status: status.toLowerCase(),
+          updated_by: "frontend",
+          updated_at: new Date()
+        }
+      };
+
+      const result = await slotsCol.updateOne(
+        { slot_id: slotId },
+        update,
+        { upsert: true }
+      );
+
+      // Read back the full document to emit
+      const updatedDoc = await slotsCol.findOne({ slot_id: slotId });
+
+      // Emit to all Socket.IO clients so they update in real time
+      io.emit("slotUpdate", updatedDoc);
+
+      console.log(`✅ Slot ${slotId} status updated from frontend →`, updatedDoc);
+
+      res.json(updatedDoc);
+    } catch (err) {
+      console.error("❌ Error updating slot status:", err);
+      res.status(500).json({ error: "Failed to update slot status" });
     }
   });
 
