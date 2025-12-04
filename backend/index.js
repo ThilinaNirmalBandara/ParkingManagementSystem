@@ -14,7 +14,8 @@ app.use(cors({
   origin: [
     "http://localhost:3000",
     "http://localhost:5173",
-    "http://136.112.175.183:3000"   // frontend on VM
+    "http://136.112.175.183:3000",   // frontend on VM
+    "https://aquamarine-taffy-6359b5.netlify.app"   //  Netlify frontend
   ],
   methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true,
@@ -30,7 +31,8 @@ const io = new Server(server, {
     origin: [
       "http://localhost:3000",
       "http://localhost:5173",
-      "http://136.112.175.183:3000"
+      "http://136.112.175.183:3000",
+      "https://aquamarine-taffy-6359b5.netlify.app"
     ],
     methods: ["GET", "POST"],
     credentials: true
