@@ -147,7 +147,7 @@ export default function App() {
             {connected ? "🟢" : "🔴"} Socket: {connected ? "Connected" : "Disconnected"}
           </span>
           <span style={{ color: "#6366f1" }}>
-            📊 Slots: {slots.length}
+            📊 Slots: {(slots.length)-1}
           </span>
           {lastUpdate && (
             <span style={{ color: "#8b5cf6" }}>

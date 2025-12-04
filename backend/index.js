@@ -29,6 +29,8 @@ const io = new Server(server, {
 });
 
 const MQTT_BROKER = process.env.MQTT_BROKER || "mqtt://127.0.0.1:1883";
+const MQTT_USERNAME = process.env.MQTT_USERNAME || "parking_admin";
+const MQTT_PASSWORD = process.env.MQTT_PASSWORD || "Password123";
 const MONGO_URL = process.env.MONGO_URL || "mongodb://127.0.0.1:27017";
 const DB_NAME = "parkingdb";
 const PORT = process.env.PORT || 3001;
@@ -59,7 +61,11 @@ const PORT = process.env.PORT || 3001;
   });
 
   // MQTT
-  const client = mqtt.connect(MQTT_BROKER, { family: 4 });
+  const client = mqtt.connect(MQTT_BROKER, { 
+    family: 4,
+    username: MQTT_USERNAME,
+    password: MQTT_PASSWORD
+   });
 
   client.on("connect", () => {
     console.log("✅ MQTT connected to broker");
