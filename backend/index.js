@@ -5,14 +5,16 @@ import mqtt from "mqtt";
 import { MongoClient } from "mongodb";
 import dotenv from "dotenv";
 import { Server } from "socket.io";
+import jwt from "jsonwebtoken"; 
 
 dotenv.config();
 
 const app = express();
 app.use(cors({
-  origin: ["http://localhost:3000", "http://localhost:5173"],
+  origin: ["http://localhost:3000", "http://localhost:5173", "http://136.112.175.183:3000"],
   methods: ["GET", "POST", "PUT", "DELETE"],
-  credentials: true
+  credentials: true,
+  allowedHeaders: ["Content-Type", "Authorization"] 
 }));
 
 app.use(express.json());
@@ -115,7 +117,7 @@ const PORT = process.env.PORT || 3001;
   });
   
   // 🆕 Update slot status from frontend
-  app.put("/api/slots/:id/status", async (req, res) => {
+  app.put("/api/slots/:id/status",requireAdmin, async (req, res) => {
     try {
       const slotId = parseInt(req.params.id, 10);
       const { status } = req.body;
@@ -128,7 +130,7 @@ const PORT = process.env.PORT || 3001;
         $set: {
           slot_id: slotId,
           status: status.toLowerCase(),
-          updated_by: "frontend",
+          updated_by: req.user?.username ||"frontend",
           updated_at: new Date()
         }
       };

@@ -1,6 +1,6 @@
 import React from "react";
 
-export default function SlotGrid({ slots, onChangeStatus }) {
+export default function SlotGrid({ slots, onChangeStatus, canEdit }) {  // 🆕 canEdit
   // Create array of 21 slots, filling in with data or defaults
   const allSlots = Array.from({ length: 21 }, (_, i) => {
     const slotNumber = i + 1;
@@ -76,21 +76,28 @@ export default function SlotGrid({ slots, onChangeStatus }) {
               textAlign: "center",
               boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
               transition: "all 0.3s ease",
-              cursor: "pointer",
+              cursor: canEdit ? "pointer" : "default",     // 🆕
               position: "relative",
-              overflow: "hidden"
+              overflow: "hidden",
+              opacity: canEdit ? 1 : 0.9                    // 🆕 subtle hint
             }}
-            // ✅ handle click → compute nextStatus → notify parent
             onClick={() => {
-              if (!onChangeStatus) return; // safety
+              if (!canEdit) {
+                // Just ignore or show message
+                alert("Login as admin to change status.");
+                return;
+              }
+              if (!onChangeStatus) return;
               const nextStatus = cycleStatus(slot.status);
               onChangeStatus(slot.slot_id, nextStatus);
             }}
             onMouseEnter={(e) => {
+              if (!canEdit) return;
               e.currentTarget.style.transform = "translateY(-5px)";
               e.currentTarget.style.boxShadow = "0 8px 12px rgba(0, 0, 0, 0.2)";
             }}
             onMouseLeave={(e) => {
+              if (!canEdit) return;
               e.currentTarget.style.transform = "translateY(0)";
               e.currentTarget.style.boxShadow = "0 4px 6px rgba(0, 0, 0, 0.1)";
             }}
