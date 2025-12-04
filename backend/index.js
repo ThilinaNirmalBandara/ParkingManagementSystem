@@ -50,8 +50,8 @@ const PORT      = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || "super-secret-change-me";
 
 // Simple hard-coded admin user (for demo)
-const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "admin";
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "Admin@123";
+const ADMIN_USER = process.env.ADMIN_USER || "admin";
+const ADMIN_PASS = process.env.ADMIN_PASS || "adminpassword";
 
 // ---- Middleware: requireAdmin ----
 function requireAdmin(req, res, next) {
@@ -77,13 +77,13 @@ function requireAdmin(req, res, next) {
 app.post("/api/admin/login", (req, res) => {
   const { username, password } = req.body || {};
 
-  if (username !== ADMIN_USERNAME || password !== ADMIN_PASSWORD) {
+  if (username !== ADMIN_USER || password !== ADMIN_PASS) {
     return res.status(401).json({ error: "Invalid credentials" });
   }
 
   const token = jwt.sign(
     { username, role: "admin" },
-    JWT_SECRET,
+     JWT_SECRET,
     { expiresIn: "8h" }
   );
 
