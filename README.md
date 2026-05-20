@@ -79,6 +79,9 @@ React Web Dashboard
 - MQTT client for publishing telemetry to the backend/cloud
 
 ---
+## Hardware Prototype
+
+![Hardware Prototype](images/Breadboard Implementation.jpeg)
 
 ## Technologies Used
 
@@ -181,6 +184,9 @@ The dashboard also shows:
 - Last update time
 
 ---
+## Real-Time Dashboard
+
+![React Dashboard](images/Dashboard.jpeg)
 
 ## API Endpoints
 
